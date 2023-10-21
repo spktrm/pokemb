@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@pkmn/dex": "^0.7.52",
+    "@pkmn/randoms": "^0.7.52",
+    "@pkmn/sim": "^0.7.52"
+  },
+  "devDependencies": {
+    "@types/node": "^20.6.2"
+  }
+}
