@@ -1,11 +1,11 @@
 {
-  "dependencies": {
-    "@pkmn/dex": "^0.7.52",
-    "@pkmn/randoms": "^0.7.52",
-    "@pkmn/sim": "^0.7.52",
-    "update": "^0.7.4"
-  },
-  "devDependencies": {
-    "@types/node": "^20.6.2"
-  }
+    "dependencies": {
+        "@pkmn/dex": "^0.7.52",
+        "@pkmn/randoms": "^0.7.52",
+        "@pkmn/sim": "^0.7.52",
+        "prettier": "^3.0.3"
+    },
+    "devDependencies": {
+        "@types/node": "^20.6.2"
+    }
 }

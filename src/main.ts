@@ -20,7 +20,7 @@ function getGenData(gen: number) {
 const data = Object.fromEntries(
     [1, 2, 3, 4, 5, 6, 7, 8, 9].map((gen) => {
         return [`gen${gen}`, getGenData(gen)];
-    })
+    }),
 );
 
 const jsonData: string = JSON.stringify(data, null, 4); // Indented with 4 spaces for readability

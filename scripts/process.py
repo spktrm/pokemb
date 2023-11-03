@@ -1,13 +1,16 @@
+import re
 import json
-import math
 import pickle
 import pandas as pd
 import numpy as np
 
 from typing import Any, Callable, Mapping, Sequence, Union
-from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
+
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.preprocessing import MinMaxScaler, MultiLabelBinarizer, OneHotEncoder
+
+
+_EXCLUDE = {"isNonstandard"}
 
 
 def get_num_unique(dataframe: pd.DataFrame, column: str) -> int:
@@ -49,7 +52,7 @@ def multihot_encode(series: pd.Series) -> pd.DataFrame:
 
 def scale_encode(
     series: pd.Series,
-    scaler_fn: Union[OneToOneFeatureMixin, TransformerMixin, BaseEstimator],
+    scaler_fn: Union[StandardScaler, MinMaxScaler],
     name: str = None,
 ) -> pd.DataFrame:
     scaler = scaler_fn()
@@ -88,6 +91,11 @@ def encode_stat(series: pd.Series):
     ]
 
 
+def concat_encodings(dataframes: Sequence[pd.DataFrame]) -> pd.DataFrame:
+    encoding = pd.concat([e.reset_index() for e in dataframes], axis=1)
+    return encoding.values.astype(np.float32)
+
+
 def get_species(dataframe: pd.DataFrame) -> np.ndarray:
     encodings = [
         multihot_encode(dataframe["types"]),
@@ -101,8 +109,7 @@ def get_species(dataframe: pd.DataFrame) -> np.ndarray:
         *encode_stat(dataframe["bst"]),
         onehot_encode(dataframe["nfe"]),
     ]
-    encoding = pd.concat(encodings, axis=1)
-    return encoding
+    return concat_encodings(encodings)
 
 
 def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
@@ -122,7 +129,7 @@ def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
 
     encodings = [
         onehot_encode(dataframe["target"]),
-        dataframe["accuracy"].map(lambda x: x if x == 1 else x / 100),
+        dataframe["accuracy"].map(lambda x: x if x == 1 else x / 100).to_frame(),
         onehot_encode(dataframe["accuracy"] == 1),
         zscore_encode(dataframe["basePower"]),
         sqrt_onehot_encode(dataframe["basePower"]),
@@ -134,9 +141,15 @@ def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
         onehot_encode(dataframe["critRatio"]),
         flags_dataframe,
         *boosts_dataframes,
-        dataframe["drain"].map(lambda x: x[0] / x[1] if isinstance(x, list) else 0),
-        dataframe["recoil"].map(lambda x: x[0] / x[1] if isinstance(x, list) else 0),
-        dataframe["heal"].map(lambda x: x[0] / x[1] if isinstance(x, list) else 0),
+        dataframe["drain"]
+        .map(lambda x: x[0] / x[1] if isinstance(x, list) else 0)
+        .to_frame(),
+        dataframe["recoil"]
+        .map(lambda x: x[0] / x[1] if isinstance(x, list) else 0)
+        .to_frame(),
+        dataframe["heal"]
+        .map(lambda x: x[0] / x[1] if isinstance(x, list) else 0)
+        .to_frame(),
         multihot_encode(
             dataframe["multihit"]
             .fillna(1)
@@ -146,42 +159,78 @@ def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
         onehot_encode(dataframe["volatileStatus"]),
         *secondary_dataframes,
     ]
-    encoding = pd.concat(encodings, axis=1)
-    return encoding.values
+    return concat_encodings(encodings)
 
 
 def get_abilities(dataframe: pd.DataFrame) -> np.ndarray:
     conditions = [column for column in dataframe if column.startswith("condition.")]
     conditions_dataframe = dataframe[conditions].fillna(0)
 
+    ons = [s for s in dataframe if re.match(r"on[A-Z]", s)]
+    ons_dataframe = dataframe[ons].fillna(0)
+
+    iss = [s for s in dataframe if re.match(r"is[A-Z]", s) and s not in _EXCLUDE]
+    iss_dataframe = dataframe[iss].fillna(0)
+
     encodings = [
-        onehot_encode(dataframe["isBreakable"]),
-        onehot_encode(dataframe["onTryHitPriority"]),
+        onehot_encode(dataframe["id"]),
+        iss_dataframe,
+        ons_dataframe,
         conditions_dataframe,
     ]
-    encoding = pd.concat(encodings, axis=1)
-    return encoding.values
+    if "suppressWeather" in dataframe.columns:
+        encodings += [dataframe["suppressWeather"].fillna(0)]
+
+    return concat_encodings(encodings)
 
 
 def get_items(dataframe: pd.DataFrame) -> np.ndarray:
-    return np.zeros(1)
+    conditions = [column for column in dataframe if column.startswith("condition.")]
+    conditions_dataframe = dataframe[conditions].fillna(0)
+
+    fling = [column for column in dataframe if column.startswith("fling.")]
+    fling_dataframe = dataframe[fling].fillna(0)
+    fling_dataframes = [
+        onehot_encode(fling_dataframe[field], lambda x: str(x)) for field in fling
+    ]
+
+    ons = [s for s in dataframe if re.match(r"on[A-Z]", s)]
+    ons_dataframe = dataframe[ons].fillna(0)
+
+    iss = [s for s in dataframe if re.match(r"is[A-Z]", s) and s not in _EXCLUDE]
+    iss_dataframe = dataframe[iss].fillna(0)
+
+    boosts = [column for column in dataframe if column.startswith("boosts.")]
+    boosts_dataframe = dataframe[boosts].fillna(0)
+    boosts_dataframes = [onehot_encode(boosts_dataframe[field]) for field in boosts]
+
+    encodings = [
+        onehot_encode(dataframe["id"]),
+        iss_dataframe,
+        ons_dataframe,
+        conditions_dataframe,
+        *fling_dataframes,
+        *boosts_dataframes,
+    ]
+
+    return concat_encodings(encodings)
 
 
 def get_conditions(dataframe: pd.DataFrame) -> np.ndarray:
-    return np.zeros(1)
+    return np.zeros((len(dataframe), 1))
 
 
 def get_typechart(dataframe: pd.DataFrame) -> np.ndarray:
-    return np.zeros(1)
+    return np.zeros((len(dataframe), 1))
 
 
 def main():
-    with open("data/data.json", "r") as f:
+    with open("data/data.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     output_obj = {}
 
-    for gen, gendata in data.items():
+    for gen, gendata in reversed(data.items()):
         output_obj[gen] = {}
         for key, records in gendata.items():
             dataframe = get_dataframe(records)
@@ -198,8 +247,9 @@ def main():
             elif key == "typechart":
                 encodings = get_typechart(dataframe)
 
-            print(gen, key, encodings.shape)
             output_obj[gen][key] = encodings
+            assert len(dataframe) == len(encodings)
+            print(gen, key, encodings.shape)
 
         print()
 
