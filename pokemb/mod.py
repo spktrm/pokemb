@@ -6,12 +6,12 @@ import torch.nn as nn
 
 
 def load_gen_data(gen: int):
-    with open(os.path.join(os.getcwd(), "data/data.json"), "r") as f:
+    with open(os.path.join(os.getcwd(), "pokemb/data/data.json"), "r") as f:
         return json.load(f)[gen]
 
 
 def load_pkl_gen(gen: int):
-    with open(os.path.join(os.getcwd(), "data/encodings.pkl"), "rb") as f:
+    with open(os.path.join(os.getcwd(), "pokemb/data/encodings.pkl"), "rb") as f:
         return pickle.load(f)[gen]
 
 
