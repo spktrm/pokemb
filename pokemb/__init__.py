@@ -1,3 +1,9 @@
 __version__ = "0.0.1"
 
-from pokemb.mod import PokEmb
+import traceback
+
+
+try:
+    from pokemb.mod import PokEmb
+except:
+    traceback.print_exc()
