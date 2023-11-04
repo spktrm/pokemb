@@ -115,7 +115,6 @@ def get_species(dataframe: pd.DataFrame, typechart: pd.DataFrame) -> np.ndarray:
         *encode_stat(dataframe["baseStats.spa"]),
         *encode_stat(dataframe["baseStats.spd"]),
         *encode_stat(dataframe["baseStats.spe"]),
-        *encode_stat(dataframe["bst"]),
         onehot_encode(dataframe["nfe"]),
         weakness_matrix,
     ]
@@ -283,26 +282,30 @@ def main():
     for gen, gendata in reversed(data.items()):
         output_obj[gen] = {}
 
-        typechart_encodings = get_typechart(get_dataframe(gendata["typechart"]))
+        try:
+            typechart_encodings = get_typechart(get_dataframe(gendata["typechart"]))
 
-        for key, records in gendata.items():
-            dataframe = get_dataframe(records)
-            if key == "species":
-                encodings = get_species(dataframe, typechart_encodings)
-            elif key == "moves":
-                encodings = get_moves(dataframe)
-            elif key == "abilities":
-                encodings = get_abilities(dataframe)
-            elif key == "items":
-                encodings = get_items(dataframe)
-            elif key == "conditions":
-                encodings = get_conditions(dataframe)
-            elif key == "typechart":
-                encodings = get_typechart(dataframe)
+            for key, records in gendata.items():
+                dataframe = get_dataframe(records)
+                if key == "species":
+                    encodings = get_species(dataframe, typechart_encodings)
+                elif key == "moves":
+                    encodings = get_moves(dataframe)
+                elif key == "abilities":
+                    encodings = get_abilities(dataframe)
+                elif key == "items":
+                    encodings = get_items(dataframe)
+                elif key == "conditions":
+                    encodings = get_conditions(dataframe)
+                elif key == "typechart":
+                    encodings = get_typechart(dataframe)
 
-            output_obj[gen][key] = encodings.values.astype(np.float32)
-            assert len(dataframe) == len(encodings)
-            print(gen, key, encodings.shape)
+                output_obj[gen][key] = encodings.values.astype(np.float32)
+                assert len(dataframe) == len(encodings)
+                print(gen, key, encodings.shape)
+
+        except:
+            break
 
         print()
 

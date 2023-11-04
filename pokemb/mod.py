@@ -6,7 +6,9 @@ import torch.nn as nn
 
 
 def load_gen_data(gen: int):
-    with open(os.path.join(os.getcwd(), "pokemb/data/data.json"), "r") as f:
+    with open(
+        os.path.join(os.getcwd(), "pokemb/data/data.json"), "r", encoding="utf-8"
+    ) as f:
         return json.load(f)[gen]
 
 
