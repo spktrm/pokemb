@@ -40,6 +40,7 @@ def get_dataframe(records: Sequence[Mapping[str, Any]]) -> pd.DataFrame:
     except:
         pass
     dataframe = remove_redundant_columns(dataframe)
+    dataframe = dataframe[sorted(dataframe.columns)]
     return dataframe
 
 
@@ -92,11 +93,19 @@ def encode_stat(series: pd.Series):
 
 
 def concat_encodings(dataframes: Sequence[pd.DataFrame]) -> pd.DataFrame:
-    encoding = pd.concat([e.reset_index() for e in dataframes], axis=1)
-    return encoding.values.astype(np.float32)
+    encoding = pd.concat([e.reset_index(drop=True) for e in dataframes], axis=1)
+    return encoding
 
 
-def get_species(dataframe: pd.DataFrame) -> np.ndarray:
+def get_species(dataframe: pd.DataFrame, typechart: pd.DataFrame) -> np.ndarray:
+    type_str = dataframe["types"].apply(lambda x: ",".join(x))
+    type_dummies = type_str.str.get_dummies(sep=",")
+    typechart_transposed = pd.DataFrame(data=typechart.values, index=typechart.columns)
+    weakness_matrix = type_dummies.apply(
+        lambda types: typechart_transposed[types == 1].prod(), axis=1
+    )
+    weakness_matrix.columns = [f"weakness.{col}" for col in typechart.columns]
+
     encodings = [
         multihot_encode(dataframe["types"]),
         *encode_stat(dataframe["weightkg"]),
@@ -108,19 +117,23 @@ def get_species(dataframe: pd.DataFrame) -> np.ndarray:
         *encode_stat(dataframe["baseStats.spe"]),
         *encode_stat(dataframe["bst"]),
         onehot_encode(dataframe["nfe"]),
+        weakness_matrix,
     ]
+
     return concat_encodings(encodings)
 
 
-def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
-    flags = [column for column in dataframe if column.startswith("flags.")]
+def get_moves(dataframe: pd.DataFrame) -> pd.DataFrame:
+    flags = [column for column in dataframe.columns if column.startswith("flags.")]
     flags_dataframe = dataframe[flags].fillna(0)
 
-    boosts = [column for column in dataframe if column.startswith("boosts.")]
+    boosts = [column for column in dataframe.columns if column.startswith("boosts.")]
     boosts_dataframe = dataframe[boosts].fillna(0)
     boosts_dataframes = [onehot_encode(boosts_dataframe[field]) for field in boosts]
 
-    secondary = [column for column in dataframe if column.startswith("secondary.")]
+    secondary = [
+        column for column in dataframe.columns if column.startswith("secondary.")
+    ]
     secondary_dataframe = dataframe[secondary].fillna(0)
     secondary_dataframes = [
         onehot_encode(secondary_dataframe[field], fn=lambda x: str(x))
@@ -162,14 +175,18 @@ def get_moves(dataframe: pd.DataFrame) -> np.ndarray:
     return concat_encodings(encodings)
 
 
-def get_abilities(dataframe: pd.DataFrame) -> np.ndarray:
-    conditions = [column for column in dataframe if column.startswith("condition.")]
+def get_abilities(dataframe: pd.DataFrame) -> pd.DataFrame:
+    conditions = [
+        column for column in dataframe.columns if column.startswith("condition.")
+    ]
     conditions_dataframe = dataframe[conditions].fillna(0)
 
-    ons = [s for s in dataframe if re.match(r"on[A-Z]", s)]
+    ons = [s for s in dataframe.columns if re.match(r"on[A-Z]", s)]
     ons_dataframe = dataframe[ons].fillna(0)
 
-    iss = [s for s in dataframe if re.match(r"is[A-Z]", s) and s not in _EXCLUDE]
+    iss = [
+        s for s in dataframe.columns if re.match(r"is[A-Z]", s) and s not in _EXCLUDE
+    ]
     iss_dataframe = dataframe[iss].fillna(0)
 
     encodings = [
@@ -181,10 +198,18 @@ def get_abilities(dataframe: pd.DataFrame) -> np.ndarray:
     if "suppressWeather" in dataframe.columns:
         encodings += [dataframe["suppressWeather"].fillna(0)]
 
+    concat = concat_encodings(encodings)
+
+    object_columns = concat.dtypes[concat.dtypes == object].index
+    encodings = [
+        concat.drop(object_columns.tolist(), axis=1),
+        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
+    ]
+
     return concat_encodings(encodings)
 
 
-def get_items(dataframe: pd.DataFrame) -> np.ndarray:
+def get_items(dataframe: pd.DataFrame) -> pd.DataFrame:
     conditions = [column for column in dataframe if column.startswith("condition.")]
     conditions_dataframe = dataframe[conditions].fillna(0)
 
@@ -213,29 +238,57 @@ def get_items(dataframe: pd.DataFrame) -> np.ndarray:
         *boosts_dataframes,
     ]
 
+    concat = concat_encodings(encodings)
+
+    object_columns = concat.dtypes[concat.dtypes == object].index
+    encodings = [
+        concat.drop(object_columns.tolist(), axis=1),
+        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
+    ]
+
     return concat_encodings(encodings)
 
 
-def get_conditions(dataframe: pd.DataFrame) -> np.ndarray:
-    return np.zeros((len(dataframe), 1))
+def get_conditions(dataframe: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame(data=np.zeros((len(dataframe), 1)))
 
 
-def get_typechart(dataframe: pd.DataFrame) -> np.ndarray:
-    return np.zeros((len(dataframe), 1))
+def get_typechart(dataframe: pd.DataFrame) -> pd.DataFrame:
+    damage_taken = [col for col in dataframe.columns if col.startswith("damageTaken")]
+    damage_taken_dataframe = dataframe[damage_taken]
+    damage_taken_values = damage_taken_dataframe.values
+
+    damage_taken_values = (
+        (damage_taken_values == 0) * 1
+        + (damage_taken_values == 1) * 2
+        + (damage_taken_values == 2) * 0.5
+        + (damage_taken_values == 3) * 0
+    )
+
+    type_names = list(map(lambda x: x.split(".")[-1], damage_taken_dataframe.columns))
+
+    damage_taken_dataframe = pd.DataFrame(
+        data=damage_taken_values, columns=type_names, index=type_names
+    )
+    encodings = [damage_taken_dataframe]
+    return concat_encodings(encodings)
 
 
 def main():
-    with open("data/data.json", "r", encoding="utf-8") as f:
+    with open("pokemb/data/data.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     output_obj = {}
 
     for gen, gendata in reversed(data.items()):
         output_obj[gen] = {}
+
+        typechart_encodings = get_typechart(get_dataframe(gendata["typechart"]))
+
         for key, records in gendata.items():
             dataframe = get_dataframe(records)
             if key == "species":
-                encodings = get_species(dataframe)
+                encodings = get_species(dataframe, typechart_encodings)
             elif key == "moves":
                 encodings = get_moves(dataframe)
             elif key == "abilities":
@@ -247,13 +300,13 @@ def main():
             elif key == "typechart":
                 encodings = get_typechart(dataframe)
 
-            output_obj[gen][key] = encodings
+            output_obj[gen][key] = encodings.values.astype(np.float32)
             assert len(dataframe) == len(encodings)
             print(gen, key, encodings.shape)
 
         print()
 
-    with open("data/encodings.pkl", "wb") as f:
+    with open("pokemb/data/encodings.pkl", "wb") as f:
         pickle.dump(output_obj, f)
 
 

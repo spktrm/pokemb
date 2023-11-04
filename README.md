@@ -1,3 +1,3 @@
-# pokemb
+# PokEmb
 
 Embeddings / Encodings for Pokemon
