@@ -2,7 +2,9 @@ from setuptools import find_packages, setup
 
 from pokemb import __version__
 
-requirements = ["numpy", "pandas", "scikit_learn", "torch", "sentence-transformers"]
+requirements = ["numpy", "torch"]
+
+generate_requirements = ["pandas", "scikit_learn", "sentence-transformers"]
 
 setup(
     name="pokemb",
@@ -15,4 +17,5 @@ setup(
     setup_requires=["wheel"],
     install_requires=requirements,
     package_data={"": ["*.ini"]},
+    extras_require=dict(generate=generate_requirements),
 )

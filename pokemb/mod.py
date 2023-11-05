@@ -1,9 +1,11 @@
-import json
 import os
+import json
 import pickle
-from typing import Any, Dict
+
 import torch
 import torch.nn as nn
+
+from typing import Any, Dict
 
 
 def load_gen_data(gen: int):
