@@ -1,0 +1,2 @@
+pokemb/data/data.json filter=lfs diff=lfs merge=lfs -text
+pokemb/data/encodings.pkl filter=lfs diff=lfs merge=lfs -text
