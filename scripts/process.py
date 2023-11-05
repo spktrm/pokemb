@@ -97,7 +97,9 @@ def concat_encodings(dataframes: Sequence[pd.DataFrame]) -> pd.DataFrame:
     return encoding
 
 
-def get_species(dataframe: pd.DataFrame, typechart: pd.DataFrame) -> np.ndarray:
+def get_species(
+    dataframe: pd.DataFrame, typechart: pd.DataFrame, learnset: pd.DataFrame
+) -> np.ndarray:
     type_str = dataframe["types"].apply(lambda x: ",".join(x))
     type_dummies = type_str.str.get_dummies(sep=",")
     typechart_transposed = pd.DataFrame(data=typechart.values, index=typechart.columns)
@@ -117,6 +119,7 @@ def get_species(dataframe: pd.DataFrame, typechart: pd.DataFrame) -> np.ndarray:
         *encode_stat(dataframe["baseStats.spe"]),
         onehot_encode(dataframe["nfe"]),
         weakness_matrix,
+        learnset,
     ]
 
     return concat_encodings(encodings)
@@ -435,6 +438,15 @@ def get_typechart(dataframe: pd.DataFrame, gen: int) -> pd.DataFrame:
     return concat_encodings(encodings)
 
 
+def get_learnset(dataframe: pd.DataFrame, mask: pd.Series):
+    learnset_columns = [
+        column for column in dataframe.columns if column.startswith("learnset")
+    ]
+    learnset_dataframe = dataframe[learnset_columns].fillna(0)
+    learnset_dataframe[learnset_dataframe != 0] = 1
+    return learnset_dataframe[mask]
+
+
 def main():
     with open("pokemb/data/data.json", "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -447,10 +459,21 @@ def main():
         genno = int(gen[len("gen") :])
         typechart_encodings = get_typechart(get_dataframe(gendata["typechart"]), genno)
 
+        species_dataframe = pd.json_normalize(gendata["species"])
+        learnset_encoding = get_learnset(
+            get_dataframe(gendata["learnsets"]),
+            mask=species_dataframe["tier"] != "Illegal",
+        )
+
         for key, records in gendata.items():
+            if key == "learnsets":
+                continue
+
             dataframe = get_dataframe(records)
             if key == "species":
-                encodings = get_species(dataframe, typechart_encodings)
+                encodings = get_species(
+                    dataframe, typechart_encodings, learnset_encoding
+                )
             elif key == "moves":
                 encodings = get_moves(dataframe, typechart_encodings)
             elif key == "abilities":
