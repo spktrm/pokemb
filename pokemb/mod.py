@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+from typing import Any, Dict
 import torch
 import torch.nn as nn
 
@@ -17,6 +18,12 @@ def load_pkl_gen(gen: int):
         return pickle.load(f)[gen]
 
 
+def is_valid(obj: Dict[str, Any]) -> bool:
+    is_illegal = obj.get("tier", "") == "Illegal"
+    is_future = obj.get("isNonstandard", "") == "Future"
+    return not (is_illegal or is_future)
+
+
 class PokEmb(nn.Module):
     def __init__(self, gen: int = 9):
         super().__init__()
@@ -27,18 +34,18 @@ class PokEmb(nn.Module):
         self.species = nn.Embedding.from_pretrained(
             torch.from_numpy(gendata["species"])
         )
-        self.species_names = [v["id"] for v in raw["species"] if v["tier"] != "Illegal"]
+        self.species_names = [v["id"] for v in raw["species"] if is_valid(v)]
 
         self.moves = nn.Embedding.from_pretrained(torch.from_numpy(gendata["moves"]))
-        self.moves_names = [v["id"] for v in raw["moves"]]
+        self.moves_names = [v["id"] for v in raw["moves"] if is_valid(v)]
 
         self.abilities = nn.Embedding.from_pretrained(
             torch.from_numpy(gendata["abilities"])
         )
-        self.abilities_names = [v["id"] for v in raw["abilities"]]
+        self.abilities_names = [v["id"] for v in raw["abilities"] if is_valid(v)]
 
         self.items = nn.Embedding.from_pretrained(torch.from_numpy(gendata["items"]))
-        self.items_names = [v["id"] for v in raw["items"]]
+        self.items_names = [v["id"] for v in raw["items"] if is_valid(v)]
 
         self.conditions = nn.Embedding.from_pretrained(
             torch.from_numpy(gendata["conditions"])

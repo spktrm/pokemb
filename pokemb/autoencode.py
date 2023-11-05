@@ -8,31 +8,38 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 
+def make_mlp(
+    input_size: int,
+    output_size: int,
+    n_layers: int = 3,
+    layer_norm: bool = True,
+) -> nn.Module:
+    layers_sizes = np.linspace(input_size, output_size, n_layers).astype(int)
+    layers = []
+    for n, (in_feature, out_feature) in enumerate(
+        zip(layers_sizes[:-1], layers_sizes[1:])
+    ):
+        layer = [nn.Linear(in_feature, out_feature)]
+        if n < (n_layers - 2):
+            layer.append(nn.ReLU())
+            if layer_norm:
+                layer.insert(1, nn.LayerNorm(out_feature))
+        layers.append(nn.Sequential(*layer))
+    return nn.Sequential(*layers)
+
+
 class AE(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int = 4):
         super().__init__()
 
-        self.encoder = nn.Sequential(
-            nn.Linear(input_size, input_size // 2),
-            nn.ReLU(),
-            nn.Linear(input_size // 2, input_size // 4),
-            nn.ReLU(),
-            nn.Linear(input_size // 4, hidden_size),
-        )
-        self.decoder = nn.Sequential(
-            nn.ReLU(),
-            nn.Linear(hidden_size, input_size // 4),
-            nn.ReLU(),
-            nn.Linear(input_size // 4, input_size // 2),
-            nn.ReLU(),
-            nn.Linear(input_size // 2, input_size),
-        )
+        self.encoder = make_mlp(input_size, hidden_size, num_layers)
+        self.decoder = make_mlp(hidden_size, input_size, num_layers)
 
     def encode(self, x):
         return self.encoder(x)
 
     def decode(self, x):
-        return self.decoder(x)
+        return self.decoder(F.relu(x))
 
     def forward(self, x):
         z = self.encode(x)
@@ -95,20 +102,24 @@ class VQVAE(nn.Module):
         super().__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
+            nn.Linear(input_size, input_size // 2),
+            nn.LayerNorm(input_size // 2),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(input_size // 2, input_size // 4),
+            nn.LayerNorm(input_size // 4),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(input_size // 4, hidden_size),
+            nn.LayerNorm(hidden_size),
         )
         self.codebook = CodeBook(hidden_size, num_embeddings, embedding_dim, beta)
         self.decoder = nn.Sequential(
+            nn.Linear(hidden_size, input_size // 4),
+            nn.LayerNorm(input_size // 4),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(input_size // 4, input_size // 2),
+            nn.LayerNorm(input_size // 2),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, input_size),
+            nn.Linear(input_size // 2, input_size),
         )
 
     def encode(self, x):
@@ -130,6 +141,7 @@ def encode(
     hidden_size: int,
     batch_size: int = 2048,
     lr: float = 3e-4,
+    thresh: float = 1e-2,
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = AE(input_size, hidden_size).to(device)
@@ -158,7 +170,7 @@ def encode(
         except KeyboardInterrupt:
             break
 
-        if loss.item() < 5e-2:
+        if loss.item() < thresh:
             break
 
     model = model.cpu()

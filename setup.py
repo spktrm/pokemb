@@ -2,12 +2,7 @@ from setuptools import find_packages, setup
 
 from pokemb import __version__
 
-requirements = [
-    "numpy==1.21.5",
-    "pandas==2.0.2",
-    "scikit_learn==1.3.2",
-    "torch==1.13.0",
-]
+requirements = ["numpy", "pandas", "scikit_learn", "torch", "sentence-transformers"]
 
 setup(
     name="pokemb",

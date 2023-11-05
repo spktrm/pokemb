@@ -4,4 +4,4 @@ data:
 	python scripts/process.py
 
 clean:
-	rm -rf data
+	rm -rf pokemb/data
