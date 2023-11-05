@@ -247,19 +247,31 @@ def get_moves(dataframe: pd.DataFrame, typechart: pd.DataFrame) -> pd.DataFrame:
         onehot_encode(dataframe["volatileStatus"]),
     ]
 
-    concat = concat_encodings(encodings)
+    encodings = concat_encodings(encodings)
 
-    object_columns = concat.dtypes[concat.dtypes == object].index.tolist()
-    object_columns += [
-        "condition.onFieldResidualOrder",
-        "condition.onSideResidualOrder",
-        "condition.onFoeTrapPokemonPriority",
-    ]
-    object_columns = [c for c in object_columns if c in concat.columns]
+    object_columns = encodings.dtypes[encodings.dtypes == object].index.tolist()
+    object_columns = [c for c in object_columns if c in encodings.columns]
 
     encodings = [
-        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
-        concat.drop(object_columns, axis=1),
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
+        encodings.drop(object_columns, axis=1),
+    ]
+
+    encodings = concat_encodings(encodings)
+
+    object_columns = encodings.max().index[encodings.max() >= 3].tolist()
+    object_columns += encodings.min().index[encodings.min() <= -3].tolist()
+    object_columns = [c for c in object_columns if c in encodings.columns]
+
+    encodings = [
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
+        encodings.drop(object_columns, axis=1),
     ]
 
     encodings = concat_encodings(encodings)
@@ -310,12 +322,29 @@ def get_abilities(dataframe: pd.DataFrame) -> pd.DataFrame:
     if "suppressWeather" in dataframe.columns:
         encodings += [dataframe["suppressWeather"].fillna(0)]
 
-    concat = concat_encodings(encodings)
+    encodings = concat_encodings(encodings)
 
-    object_columns = concat.dtypes[concat.dtypes == object].index
+    object_columns = encodings.dtypes[encodings.dtypes == object].index
     encodings = [
-        concat.drop(object_columns.tolist(), axis=1),
-        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
+        encodings.drop(object_columns.tolist(), axis=1),
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
+    ]
+    encodings = concat_encodings(encodings)
+
+    object_columns = encodings.dtypes[encodings.dtypes == object].index.tolist()
+    object_columns += encodings.max().index[encodings.max() >= 3].tolist()
+    object_columns += encodings.min().index[encodings.min() <= -3].tolist()
+    object_columns = [c for c in object_columns if c in encodings.columns]
+
+    encodings = [
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
+        encodings.drop(object_columns, axis=1),
     ]
 
     return concat_encodings(encodings)
@@ -343,32 +372,33 @@ def get_items(dataframe: pd.DataFrame) -> pd.DataFrame:
         description_dataframe,
     ]
 
-    concat = concat_encodings(encodings)
+    encodings = concat_encodings(encodings)
 
-    object_columns = concat.dtypes[concat.dtypes == object].index
+    object_columns = encodings.dtypes[encodings.dtypes == object].index
     encodings = [
-        concat.drop(object_columns.tolist(), axis=1),
-        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
+        encodings.drop(object_columns.tolist(), axis=1),
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
     ]
 
     encodings = concat_encodings(encodings)
 
-    object_columns = concat.dtypes[concat.dtypes == object].index.tolist()
-    object_columns += [
-        "condition.onResidualOrder",
-        "condition.onResidualSubOrder",
-        "condition.onBasePowerPriority",
-    ]
-    object_columns = [c for c in object_columns if c in concat.columns]
+    object_columns = encodings.dtypes[encodings.dtypes == object].index.tolist()
+    object_columns += encodings.max().index[encodings.max() >= 3].tolist()
+    object_columns += encodings.min().index[encodings.min() <= -3].tolist()
+    object_columns = [c for c in object_columns if c in encodings.columns]
 
     encodings = [
-        *[onehot_encode(concat[column], lambda x: str(x)) for column in object_columns],
-        concat.drop(object_columns, axis=1),
+        *[
+            onehot_encode(encodings[column], lambda x: str(x))
+            for column in object_columns
+        ],
+        encodings.drop(object_columns, axis=1),
     ]
 
-    encodings = concat_encodings(encodings)
-
-    return encodings
+    return concat_encodings(encodings)
 
 
 def get_conditions(dataframe: pd.DataFrame) -> pd.DataFrame:
