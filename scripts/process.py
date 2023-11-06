@@ -108,6 +108,17 @@ def get_species(
     )
     weakness_matrix.columns = [f"weakness.{col}" for col in typechart.columns]
 
+    ability_columns = [
+        column for column in dataframe.columns if column.startswith("abilities")
+    ]
+
+    dataframe["abilities"] = dataframe.fillna("").apply(
+        lambda row: [
+            value for value in [row[column] for column in ability_columns] if value
+        ],
+        axis=1,
+    )
+
     encodings = [
         multihot_encode(dataframe["types"]),
         *encode_stat(dataframe["weightkg"]),
@@ -119,6 +130,7 @@ def get_species(
         *encode_stat(dataframe["baseStats.spe"]),
         onehot_encode(dataframe["nfe"]),
         weakness_matrix,
+        multihot_encode(dataframe["abilities"]),
         learnset,
     ]
 

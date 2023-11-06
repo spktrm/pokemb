@@ -1,2 +1,6 @@
 pokemb/data/data.json filter=lfs diff=lfs merge=lfs -text
 pokemb/data/encodings.pkl filter=lfs diff=lfs merge=lfs -text
+pokemb/data/encodings-128.pkl filter=lfs diff=lfs merge=lfs -text
+pokemb/data/encodings-256.pkl filter=lfs diff=lfs merge=lfs -text
+pokemb/data/encodings-32.pkl filter=lfs diff=lfs merge=lfs -text
+pokemb/data/encodings-64.pkl filter=lfs diff=lfs merge=lfs -text
