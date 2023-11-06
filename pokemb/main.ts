@@ -13,7 +13,6 @@ async function getGenData(gen: number) {
         moves: dex.moves.all(),
         abilities: dex.abilities.all(),
         items: dex.items.all(),
-        conditions: dex.data.Conditions,
         typechart: dex.types.all(),
         learnsets,
     };

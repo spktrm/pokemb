@@ -478,8 +478,10 @@ def main():
         )
 
         for key, records in gendata.items():
-            if key == "learnsets":
+            if key in {"learnsets", "typechart"}:
                 continue
+
+            output_obj[gen][key] = {}
 
             dataframe = get_dataframe(records)
             if key == "species":
@@ -492,12 +494,11 @@ def main():
                 encodings = get_abilities(dataframe)
             elif key == "items":
                 encodings = get_items(dataframe)
-            elif key == "conditions":
-                encodings = get_conditions(dataframe)
-            elif key == "typechart":
-                encodings = get_typechart(dataframe, genno)
 
-            output_obj[gen][key] = encodings.values.astype(np.float32)
+            output_obj[gen][key]["vectors"] = encodings.values.astype(np.float32)
+            output_obj[gen][key]["mask"] = dataframe.index.to_numpy()
+            output_obj[gen][key]["names"] = dataframe["id"][dataframe.index].to_numpy()
+
             assert len(dataframe) == len(encodings)
             print(gen, key, encodings.shape)
 

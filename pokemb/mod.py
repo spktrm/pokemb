@@ -1,6 +1,6 @@
 import os
-import json
 import pickle
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -11,28 +11,17 @@ from typing import Any, Dict, Literal
 EncodingType = Literal["raw", "pretrained"]
 EncodingSize = Literal[32, 64, 128, 256]
 
-
-def load_gen_data(gen: int):
-    with open(
-        os.path.join(os.getcwd(), "pokemb/data/data.json"), "r", encoding="utf-8"
-    ) as f:
-        return json.load(f)[gen]
+ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def load_pkl_gen(gen: int, type: EncodingType, size: EncodingSize):
-    path = "pokemb/data/encodings"
+    path = "data/encodings"
     if type != "raw":
         path += f"-{size}"
     path += ".pkl"
 
-    with open(os.path.join(os.getcwd(), path), "rb") as f:
+    with open(os.path.join(ROOT_DIR, path), "rb") as f:
         return pickle.load(f)[gen]
-
-
-def is_valid(obj: Dict[str, Any]) -> bool:
-    is_illegal = obj.get("tier", "") == "Illegal"
-    is_future = obj.get("isNonstandard", "") == "Future"
-    return not (is_illegal or is_future)
 
 
 class PokEmb(nn.Module):
@@ -44,35 +33,26 @@ class PokEmb(nn.Module):
     ):
         super().__init__()
 
-        raw = load_gen_data(f"gen{gen}")
-        gendata = load_pkl_gen(f"gen{gen}", encoding_type, size)
+        gendata = load_pkl_gen(f"gen{gen}", "raw", size)
+        if encoding_type != "raw":
+            override = load_pkl_gen(f"gen{gen}", encoding_type, size)
 
-        self.species = nn.Embedding.from_pretrained(
-            torch.from_numpy(gendata["species"])
-        )
-        self.species_names = [v["id"] for v in raw["species"] if is_valid(v)]
+            for key, vectors in override.items():
+                gendata[key]["vectors"] = vectors
 
-        self.moves = nn.Embedding.from_pretrained(torch.from_numpy(gendata["moves"]))
-        self.moves_names = [v["id"] for v in raw["moves"] if is_valid(v)]
+        self.load_matrix(gendata, "species")
+        self.load_matrix(gendata, "moves")
+        self.load_matrix(gendata, "abilities")
+        self.load_matrix(gendata, "items")
 
-        self.abilities = nn.Embedding.from_pretrained(
-            torch.from_numpy(gendata["abilities"])
-        )
-        self.abilities_names = [v["id"] for v in raw["abilities"] if is_valid(v)]
-
-        self.items = nn.Embedding.from_pretrained(torch.from_numpy(gendata["items"]))
-        self.items_names = [v["id"] for v in raw["items"] if is_valid(v)]
-
-        if encoding_type == "raw":
-            self.conditions = nn.Embedding.from_pretrained(
-                torch.from_numpy(gendata["conditions"])
-            )
-            self.conditions_names = raw["conditions"]
-
-            self.typechart = nn.Embedding.from_pretrained(
-                torch.from_numpy(gendata["typechart"])
-            )
-            self.typechart_names = raw["typechart"]
+    def load_matrix(self, gendata: Dict[str, Any], name: str):
+        data = gendata[name]
+        mask = data["mask"]
+        vectors = data["vectors"]
+        placeholder = np.zeros((mask.max() + 1, vectors.shape[-1]))
+        placeholder[mask] = data["vectors"]
+        setattr(self, name, nn.Embedding.from_pretrained(torch.from_numpy(placeholder)))
+        setattr(self, f"{name}_names", data["names"].tolist())
 
     def forward(self, indices: torch.Tensor) -> torch.Tensor:
         ...
