@@ -1,1 +1,1 @@
-recursive-include pokemb/data *
+recursive-include pokemb/data *.pkl
