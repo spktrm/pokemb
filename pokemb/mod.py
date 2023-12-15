@@ -47,11 +47,11 @@ class ComponentEmbedding(nn.Module):
         self,
         gendata: Dict[str, Any],
         name: str,
+        output_size: int,
         num_layers: int = 1,
         num_unknown: int = 1,
         use_layer_norm: bool = False,
-        include_mlp: bool = False,
-        output_size: int = None,
+        include_mlp: bool = True,
     ):
         super().__init__()
         self.name = name

@@ -6,8 +6,12 @@ import numpy as np
 
 from typing import Any, Callable, Mapping, Sequence, Union
 
-from sklearn.discriminant_analysis import StandardScaler
-from sklearn.preprocessing import MinMaxScaler, MultiLabelBinarizer, OneHotEncoder
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    MultiLabelBinarizer,
+    OneHotEncoder,
+    StandardScaler,
+)
 from sentence_transformers import SentenceTransformer
 
 _EXCLUDE = {"isNonstandard"}
@@ -32,7 +36,7 @@ def get_dataframe(records: Sequence[Mapping[str, Any]]) -> pd.DataFrame:
     except:
         pass
     try:
-        dataframe = dataframe[dataframe["isNonstandard"] != "Future"]
+        dataframe = dataframe[dataframe["isNonstandard"].map(lambda x: x is None)]
     except:
         pass
     try:
@@ -474,7 +478,8 @@ def main():
         species_dataframe = pd.json_normalize(gendata["species"])
         learnset_encoding = get_learnset(
             get_dataframe(gendata["learnsets"]),
-            mask=species_dataframe["tier"] != "Illegal",
+            mask=(species_dataframe["tier"] != "Illegal")
+            & (species_dataframe["isNonstandard"].map(lambda x: x is None)),
         )
 
         for key, records in gendata.items():
@@ -484,23 +489,31 @@ def main():
             output_obj[gen][key] = {}
 
             dataframe = get_dataframe(records)
-            if key == "species":
-                encodings = get_species(
-                    dataframe, typechart_encodings, learnset_encoding
-                )
-            elif key == "moves":
-                encodings = get_moves(dataframe, typechart_encodings)
-            elif key == "abilities":
-                encodings = get_abilities(dataframe)
-            elif key == "items":
-                encodings = get_items(dataframe)
 
-            output_obj[gen][key]["vectors"] = encodings.values.astype(np.float32)
-            output_obj[gen][key]["mask"] = dataframe.index.to_numpy()
-            output_obj[gen][key]["names"] = dataframe["id"][dataframe.index].to_numpy()
+            try:
+                if key == "species":
+                    encodings = get_species(
+                        dataframe, typechart_encodings, learnset_encoding
+                    )
+                elif key == "moves":
+                    encodings = get_moves(dataframe, typechart_encodings)
+                elif key == "abilities":
+                    encodings = get_abilities(dataframe)
+                elif key == "items":
+                    encodings = get_items(dataframe)
+            except:
+                import traceback
 
-            assert len(dataframe) == len(encodings)
-            print(gen, key, encodings.shape)
+                traceback.print_exc()
+            else:
+                output_obj[gen][key]["vectors"] = encodings.values.astype(np.float32)
+                output_obj[gen][key]["mask"] = dataframe["index"].to_numpy()
+                output_obj[gen][key]["names"] = dataframe["id"][
+                    dataframe.index
+                ].to_numpy()
+
+                assert len(dataframe) == len(encodings)
+                print(gen, key, encodings.shape)
 
         print()
 
