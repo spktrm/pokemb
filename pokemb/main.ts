@@ -100,14 +100,15 @@ function addIndices(
         items: { [key: string]: number };
     },
 ) {
+    const moves = gendata.moves.map((x) => {
+        return { ...x, index: indices.moves[getMoveId(x)] };
+    })
     return {
         ...gendata,
         species: gendata.species.map((x) => {
             return { ...x, index: indices.species[x.id] };
         }),
-        moves: gendata.moves.map((x) => {
-            return { ...x, index: indices.moves[getMoveId(x)] };
-        }),
+        moves,
         abilities: gendata.abilities.map((x) => {
             return { ...x, index: indices.abilities[x.id] };
         }),

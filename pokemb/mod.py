@@ -38,16 +38,17 @@ def make_mlp(
             layer.append(nn.ReLU())
             if layer_norm:
                 layer.insert(1, nn.LayerNorm(out_feature))
-        layers.append(nn.Sequential(*layer))
+        layers += layer
     return nn.Sequential(*layers)
 
 
 class ComponentEmbedding(nn.Module):
     def __init__(
         self,
-        gendata: Dict[str, Any],
         name: str,
         output_size: int,
+        gen: int = None,
+        gendata: Dict[str, Any] = None,
         num_layers: int = 1,
         num_unknown: int = 1,
         use_layer_norm: bool = False,
@@ -55,6 +56,10 @@ class ComponentEmbedding(nn.Module):
     ):
         super().__init__()
         self.name = name
+
+        if gendata is None:
+            gendata = load_pkl_gen(gen)
+
         data = gendata[name]
         mask = data["mask"]
         self.mask = mask
@@ -85,6 +90,12 @@ class ComponentEmbedding(nn.Module):
                 (indices < self.num_unknown).unsqueeze(-1),
                 self.unknown(indices.clamp(min=0, max=self.num_unknown - 1)),
                 self.mlp(self.data((indices - self.num_unknown).clamp(min=0))),
+            )
+        else:
+            return torch.where(
+                (indices < self.num_unknown).unsqueeze(-1),
+                self.unknown(indices.clamp(min=0, max=self.num_unknown - 1)),
+                self.data((indices - self.num_unknown).clamp(min=0)),
             )
 
 
